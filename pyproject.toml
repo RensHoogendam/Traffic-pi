@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "traffic-pi"
+version = "1.0.0"
+description = "A computer vision system for detecting and classifying traffic lights"
+authors = [{name = "Traffic-pi Project"}]
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+keywords = ["computer-vision", "traffic-lights", "opencv", "detection", "raspberry-pi"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+]
+dependencies = [
+    "opencv-python>=4.8.0",
+    "numpy>=1.20.0",
+    "pillow>=8.0.0",
+    "matplotlib>=3.5.0",
+    "scipy>=1.7.0",
+    "PyYAML>=5.4.0",
+    "pytest>=6.0.0",
+    "yt-dlp>=2024.12.0",
+    "requests>=2.25.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=6.0.0", "pytest-cov>=3.0.0", "black", "flake8"]
+ml = ["scikit-learn>=1.0.0", "tensorflow>=2.8.0"]
+pi = ["RPi.GPIO>=0.7.0", "picamera2>=0.3.0"]
+
+[project.urls]
+Homepage = "https://github.com/RensHoogendam/Traffic-pi"
+Repository = "https://github.com/RensHoogendam/Traffic-pi"
+Issues = "https://github.com/RensHoogendam/Traffic-pi/issues"
+
+[project.scripts]
+traffic-pi = "src.main:main"
+traffic-detect = "src.main:main"
+
+[tool.setuptools.packages.find]
+include = ["src*"]
+
+[tool.setuptools.package-data]
+"*" = ["config/*.yaml"]

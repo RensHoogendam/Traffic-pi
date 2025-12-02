@@ -1,0 +1,53 @@
+# Traffic Light Detection Configuration
+# Adjust these parameters to fine-tune detection for your specific use case
+
+# Contour area constraints (in pixels)
+min_contour_area: 100        # Minimum area for a valid traffic light detection
+max_contour_area: 10000      # Maximum area for a valid traffic light detection
+
+# Shape validation parameters
+aspect_ratio_tolerance: 0.3   # Tolerance for aspect ratio (how circular the shape should be)
+circularity_threshold: 0.5    # Minimum circularity score (0.0 = line, 1.0 = perfect circle)
+
+# Color detection parameters
+brightness_threshold: 100     # Minimum brightness for color detection
+
+# HSV color ranges for traffic light colors
+# Format: [hue_min, saturation_min, value_min] to [hue_max, saturation_max, value_max]
+color_ranges:
+  red:
+    - [[0, 50, 50], [10, 255, 255]]      # Lower red range (0°-10°)
+    - [[170, 50, 50], [180, 255, 255]]   # Upper red range (170°-180°)
+  yellow:
+    - [[20, 50, 50], [30, 255, 255]]     # Yellow range (20°-30°)
+  green:
+    - [[40, 50, 50], [80, 255, 255]]     # Green range (40°-80°)
+
+# Detection confidence parameters
+min_confidence: 0.5           # Minimum confidence score to accept a detection
+confidence_weights:
+  fill_ratio: 0.6            # Weight for how well the detection fills its bounding box
+  circularity: 0.4           # Weight for how circular the shape is
+
+# Grouping parameters (for combining nearby detections)
+max_grouping_distance: 100    # Maximum distance (pixels) to group detections as same light
+
+# Morphological operations
+morphology_kernel_size: 5     # Size of kernel for opening/closing operations
+
+# Display parameters
+show_debug_info: false        # Show additional debug information
+draw_contours: false          # Draw detected contours on output image
+
+# Camera/video parameters
+default_camera_index: 0       # Default camera to use (0 is usually built-in camera)
+video_fps_limit: 30          # Maximum FPS for video processing (0 = no limit)
+
+# Performance optimization
+resize_width: 640            # Resize images to this width for faster processing (0 = no resize)
+roi_enabled: false           # Enable region of interest processing
+roi_coordinates: [0, 0, 640, 480]  # [x, y, width, height] for ROI
+
+# Advanced detection parameters
+use_adaptive_threshold: false  # Use adaptive thresholding for better performance in varying light
+gaussian_blur_kernel: 3       # Kernel size for Gaussian blur preprocessing (0 = no blur)
