@@ -13,71 +13,105 @@ A computer vision system for detecting and classifying traffic lights using Pyth
 
 ## Quick Start
 
-### Installation
+### Easy Installation (Recommended)
 
-#### Standard Python Package Installation
+**One command setup:**
 
-1. **Clone and install:**
+```bash
+git clone https://github.com/RensHoogendam/Traffic-pi.git
+cd Traffic-pi
+bash setup.sh
+```
+
+Or using Make:
+
+```bash
+git clone https://github.com/RensHoogendam/Traffic-pi.git
+cd Traffic-pi
+make setup
+```
+
+That's it! The script automatically:
+
+- Creates a virtual environment
+- Installs all dependencies
+- Sets up the project in development mode
+
+### Manual Installation
+
+If you prefer manual setup:
+
+1. **Clone and create virtual environment:**
+
    ```bash
    git clone https://github.com/RensHoogendam/Traffic-pi.git
    cd Traffic-pi
-   pip install -e .
-   ```
-
-#### Development Installation  
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/RensHoogendam/Traffic-pi.git
-   cd Traffic-pi
-   ```
-
-2. **Set up virtual environment:**
-   ```bash
-   python -m venv venv
+   python3 -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
-3. **Install in development mode:**
+2. **Install:**
    ```bash
    pip install -e .
    ```
 
 ### Basic Usage
 
-#### Standard Commands (After Installation):
+**First, activate the virtual environment:**
+
+```bash
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+#### Quick Commands with Make:
+
+```bash
+make help          # Show all available commands
+make run-test      # Run system test
+make run-camera    # Start camera detection
+make test          # Run test suite
+```
+
+#### CLI Commands:
 
 **Detect traffic lights in a single image:**
+
 ```bash
 traffic-pi --image path/to/image.jpg
 ```
 
 **Process a video file:**
+
 ```bash
 traffic-pi --video path/to/video.mp4 --output results/output_video.mp4
 ```
 
 **Process a YouTube video:**
+
 ```bash
 traffic-pi --video "https://www.youtube.com/watch?v=VIDEO_ID" --output results/youtube_result.mp4
 ```
 
 **Use live camera feed:**
+
 ```bash
 traffic-pi --camera
 ```
 
 **Batch process multiple images:**
+
 ```bash
 traffic-pi --batch path/to/images/ --output results/
 ```
 
 **Alternative command:**
+
 ```bash
 traffic-detect --image path/to/image.jpg  # Same as traffic-pi
 ```
 
 #### Test the Installation:
+
 ```bash
 python test_system.py
 ```
@@ -111,11 +145,13 @@ traffic-pi --video "https://youtu.be/VIDEO_ID" --output results/youtube_analysis
 ```
 
 **Supported YouTube URL formats:**
+
 - `https://www.youtube.com/watch?v=VIDEO_ID`
 - `https://youtu.be/VIDEO_ID`
 - `https://m.youtube.com/watch?v=VIDEO_ID`
 
 The system automatically:
+
 1. Downloads the video in the best available quality
 2. Processes it for traffic light detection
 3. Cleans up temporary files after processing
@@ -125,16 +161,16 @@ The system automatically:
 The traffic light detection system uses computer vision techniques:
 
 1. **Color Segmentation**: Converts images to HSV color space and creates masks for red, yellow, and green colors
-2. **Shape Analysis**: Identifies circular/elliptical shapes that match traffic light characteristics  
+2. **Shape Analysis**: Identifies circular/elliptical shapes that match traffic light characteristics
 3. **Contour Detection**: Finds and validates contours based on area, circularity, and other properties
 4. **Confidence Scoring**: Assigns confidence scores based on shape quality and color intensity
 5. **Grouping**: Groups nearby detections to avoid duplicate detections of the same light
 
 ### Detection Algorithm
 
-- **HSV Color Ranges**: 
+- **HSV Color Ranges**:
   - Red: [0°-10°, 170°-180°] hue ranges
-  - Yellow: [20°-30°] hue range  
+  - Yellow: [20°-30°] hue range
   - Green: [40°-80°] hue range
 - **Shape Validation**: Circularity > 0.3, appropriate area range
 - **Morphological Operations**: Opening and closing to clean up noise
@@ -180,11 +216,13 @@ for detection in detections:
 For Raspberry Pi deployment:
 
 1. **Enable camera (if using Pi camera):**
+
    ```bash
    sudo raspi-config  # Enable camera interface
    ```
 
 2. **Install Pi-specific packages:**
+
    ```bash
    # Uncomment RPi.GPIO and picamera2 lines in requirements.txt
    pip install RPi.GPIO picamera2
@@ -198,6 +236,7 @@ For Raspberry Pi deployment:
 ## Testing
 
 Run the test suite:
+
 ```bash
 cd tests
 python -m pytest
@@ -224,16 +263,19 @@ python -m pytest
 ### Common Issues
 
 **No detections found:**
+
 - Check lighting conditions (avoid very bright or dark images)
 - Adjust HSV color ranges in the configuration
 - Ensure traffic lights are clearly visible and not too small/large
 
 **False positives:**
+
 - Increase `circularity_threshold` parameter
 - Adjust `min_contour_area` and `max_contour_area`
 - Fine-tune color ranges to be more restrictive
 
 **Poor performance:**
+
 - Reduce image resolution
 - Process only regions of interest
 - Consider using a more powerful device
