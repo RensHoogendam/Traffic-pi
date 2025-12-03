@@ -50,15 +50,16 @@ roi_coordinates: [0, 0, 640, 480]  # [x, y, width, height] for ROI
 
 # YOLO detection parameters
 use_yolo: true                # Use YOLO model for detection (more accurate)
-yolo_model: "yolov8s.pt"      # Small model for better accuracy at distance
-yolo_confidence: 0.15         # Lower confidence for distant objects
+yolo_model: "yolov8n.pt"      # Nano model for speed (use yolov8s.pt for better distant detection)
+yolo_confidence: 0.25         # Balanced confidence for speed vs accuracy
 yolo_classes: [9]             # COCO class IDs to detect (9 = traffic light)
-yolo_imgsz: 640               # Image size for YOLO inference (higher = better distant detection)
-yolo_augment: true            # Use test-time augmentation for better detection
+pole_classes: [10, 11]        # COCO classes for poles: 10=fire hydrant, 11=stop sign (pole-like objects)
+yolo_imgsz: 416               # Smaller image size for faster inference (use 640 for better distant detection)
+yolo_augment: false           # Disable augmentation for speed
 
 # Multi-scale detection settings
-enable_multiscale: true       # Process image at multiple scales
-scale_factors: [0.8, 1.0, 1.2, 1.5]  # Scale factors for multi-scale detection
+enable_multiscale: false      # Process image at multiple scales (slower but better for distant objects)
+scale_factors: [1.0, 1.2]     # Reduced scale factors for better performance
 
 # Adaptive confidence based on image characteristics
 adaptive_confidence: true     # Automatically adjust confidence based on image size/quality
@@ -66,6 +67,23 @@ min_yolo_confidence: 0.1      # Minimum YOLO confidence for large/high-quality i
 max_yolo_confidence: 0.3      # Maximum YOLO confidence for small/low-quality images
 image_size_threshold: 800     # Images larger than this use lower confidence for distant objects
 
+# Auto pole detection settings
+scene_complexity_threshold: 3 # If single-stage finds fewer than this, skip pole detection
+max_initial_detections: 10    # If single-stage finds more than this, use pole detection
+
 # Advanced detection parameters
 use_adaptive_threshold: false # Use adaptive thresholding for better performance in varying light
 gaussian_blur_kernel: 3       # Kernel size for Gaussian blur preprocessing (0 = no blur)
+
+# Performance optimization
+enable_preprocessing: false   # Enable image preprocessing (slower but better for distant objects)
+fast_mode: true              # Use faster settings for real-time processing
+skip_frames: 2               # Process every Nth frame for video (1 = every frame)
+
+# Two-stage detection (poles first, then lights)
+enable_pole_detection: false  # Detect traffic light poles first (good for complex scenes)
+auto_pole_detection: true     # Automatically enable pole detection for complex scenes
+pole_expansion_factor: 1.3    # How much to expand pole bounding box when searching for lights
+min_pole_height: 100          # Minimum height for traffic light pole detection
+max_pole_width: 100           # Maximum width for traffic light pole detection
+max_pole_regions: 3           # Maximum number of pole regions to search (performance limit)

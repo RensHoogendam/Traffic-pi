@@ -126,12 +126,58 @@ class TrafficLightDetector:
     def _detect_with_yolo(self, image: np.ndarray) -> List[Dict]:
         """
         Use YOLO model to detect traffic lights.
+        Two-stage approach: detect poles first, then search for lights within pole regions.
         
         Args:
             image: Input image as numpy array (BGR format)
             
         Returns:
             List of detected traffic lights with enhanced state classification
+        """
+        # Smart detection strategy selection
+        use_two_stage = self.config.get('enable_pole_detection', False)
+        
+        # Auto pole detection: try single-stage first, then decide
+        if not use_two_stage and self.config.get('auto_pole_detection', True):
+            if self.debug:
+                print("Auto-detection: trying single-stage first")
+            
+            # Quick single-stage detection with normal confidence
+            quick_results = self._single_stage_yolo_detection(image)
+            
+            # Decide based on results
+            num_detections = len(quick_results)
+            complexity_threshold = self.config.get('scene_complexity_threshold', 3)
+            max_detections = self.config.get('max_initial_detections', 10)
+            
+            if num_detections == 0:
+                # No detections - try two-stage with lower confidence
+                if self.debug:
+                    print(f"No detections found, trying two-stage detection")
+                use_two_stage = True
+            elif num_detections > max_detections:
+                # Too many detections - use pole detection to filter
+                if self.debug:
+                    print(f"Too many detections ({num_detections}), using pole filtering")
+                use_two_stage = True
+            else:
+                # Good number of detections - use single-stage results
+                if self.debug:
+                    print(f"Single-stage successful ({num_detections} detections)")
+                return quick_results
+        
+        if use_two_stage:
+            if self.debug:
+                print("Using two-stage detection (poles first)")
+            return self._two_stage_detection(image)
+        else:
+            if self.debug:
+                print("Using single-stage detection")
+            return self._single_stage_yolo_detection(image)
+    
+    def _single_stage_yolo_detection(self, image: np.ndarray) -> List[Dict]:
+        """
+        Original single-stage YOLO detection for traffic lights.
         """
         # Preprocess image for better distant detection
         processed_image = self._preprocess_for_distant_detection(image)
@@ -146,8 +192,11 @@ class TrafficLightDetector:
         if self.config.get('enable_multiscale', False):
             results = self._multiscale_yolo_detection(image, yolo_conf, yolo_classes, yolo_imgsz, yolo_augment)
         else:
-            # Preprocess image for better distant detection
-            processed_image = self._preprocess_for_distant_detection(image)
+            # Conditionally preprocess image based on config
+            if self.config.get('enable_preprocessing', False):
+                processed_image = self._preprocess_for_distant_detection(image)
+            else:
+                processed_image = image
             results = self.yolo_model(processed_image, conf=yolo_conf, classes=yolo_classes, imgsz=yolo_imgsz, augment=yolo_augment)
         
         detected_lights = []
@@ -185,6 +234,239 @@ class TrafficLightDetector:
                         })
         
         return detected_lights
+    
+    def _two_stage_detection(self, image: np.ndarray) -> List[Dict]:
+        """
+        Two-stage detection: first find poles/structures, then search for traffic lights within those areas.
+        """
+        detected_lights = []
+        
+        # Stage 1: Detect pole-like structures and vertical objects
+        pole_regions = self._detect_pole_structures(image)
+        
+        if self.debug:
+            print(f"Found {len(pole_regions)} potential pole regions")
+        
+        if not pole_regions:
+            # If no poles found, fall back to full image detection
+            if self.debug:
+                print("No poles found, falling back to full image detection")
+            return self._single_stage_yolo_detection(image)
+        
+        # Stage 2: Search for traffic lights within pole regions
+        for i, pole_region in enumerate(pole_regions):
+            x, y, w, h = pole_region
+            
+            # Expand the pole region to catch traffic lights attached to or near the pole
+            expansion = self.config.get('pole_expansion_factor', 1.5)
+            expanded_w = int(w * expansion)
+            expanded_h = int(h * expansion)
+            expanded_x = max(0, x - (expanded_w - w) // 2)
+            expanded_y = max(0, y - (expanded_h - h) // 2)
+            
+            # Ensure we don't go out of image bounds
+            expanded_w = min(expanded_w, image.shape[1] - expanded_x)
+            expanded_h = min(expanded_h, image.shape[0] - expanded_y)
+            
+            # Extract the region around the pole
+            pole_roi = image[expanded_y:expanded_y+expanded_h, expanded_x:expanded_x+expanded_w]
+            
+            if pole_roi.size == 0:
+                continue
+                
+            if self.debug:
+                print(f"Searching pole region {i}: ({expanded_x}, {expanded_y}, {expanded_w}, {expanded_h})")
+            
+            # Detect traffic lights in this region with higher sensitivity
+            region_lights = self._detect_lights_in_region(pole_roi, expanded_x, expanded_y)
+            
+            # Adjust coordinates back to full image
+            for light in region_lights:
+                light['bbox'] = (
+                    light['bbox'][0] + expanded_x,
+                    light['bbox'][1] + expanded_y,
+                    light['bbox'][2],
+                    light['bbox'][3]
+                )
+                light['center'] = (
+                    light['center'][0] + expanded_x,
+                    light['center'][1] + expanded_y
+                )
+                light['method'] = 'two-stage'
+                
+            detected_lights.extend(region_lights)
+        
+        return detected_lights
+    
+    def _detect_pole_structures(self, image: np.ndarray) -> List[Tuple[int, int, int, int]]:
+        """
+        Detect vertical pole-like structures that might support traffic lights.
+        Uses both YOLO detection and contour analysis.
+        """
+        pole_regions = []
+        
+        # Method 1: Use YOLO to detect pole-like objects (stop signs, fire hydrants, etc.)
+        try:
+            # Look for pole-like objects with lower confidence to catch more candidates
+            pole_classes = self.config.get('pole_classes', [10, 11])  # fire hydrant, stop sign
+            results = self.yolo_model(image, conf=0.1, classes=pole_classes, verbose=False)
+            
+            for result in results:
+                if result.boxes is not None:
+                    for box in result.boxes:
+                        x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                        pole_regions.append((int(x1), int(y1), int(x2-x1), int(y2-y1)))
+        except Exception as e:
+            if self.debug:
+                print(f"YOLO pole detection failed: {e}")
+        
+        # Method 2: Fast contour-based vertical structure detection (only if needed)
+        if len(pole_regions) < 2:  # Only do contour analysis if YOLO didn't find enough
+            # Resize image for faster processing
+            height, width = image.shape[:2]
+            scale = min(1.0, 400 / max(width, height))  # Max 400px for speed
+            
+            if scale < 1.0:
+                small_img = cv2.resize(image, (int(width * scale), int(height * scale)))
+            else:
+                small_img = image
+            
+            gray = cv2.cvtColor(small_img, cv2.COLOR_BGR2GRAY)
+            edges = cv2.Canny(gray, 50, 150)
+            
+            # Find contours
+            contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
+            min_height = self.config.get('min_pole_height', 100) * scale
+            max_width = self.config.get('max_pole_width', 100) * scale
+            
+            for contour in contours:
+                x, y, w, h = cv2.boundingRect(contour)
+                
+                # Check if this looks like a vertical pole
+                aspect_ratio = h / w if w > 0 else 0
+                
+                # Poles should be tall and narrow
+                if (h >= min_height and w <= max_width and 
+                    aspect_ratio >= 3 and h < small_img.shape[0] * 0.8):
+                    # Scale back to original coordinates
+                    if scale < 1.0:
+                        x, y, w, h = int(x / scale), int(y / scale), int(w / scale), int(h / scale)
+                    pole_regions.append((x, y, w, h))
+        
+        # Remove overlapping regions and limit count for performance
+        pole_regions = self._remove_overlapping_regions(pole_regions)
+        
+        # Limit number of pole regions for performance
+        max_regions = self.config.get('max_pole_regions', 3)
+        if len(pole_regions) > max_regions:
+            # Keep the tallest/most promising regions
+            pole_regions = sorted(pole_regions, key=lambda r: r[3], reverse=True)[:max_regions]
+            if self.debug:
+                print(f"Limited to {max_regions} pole regions for performance")
+        
+        return pole_regions
+    
+    def _detect_lights_in_region(self, region: np.ndarray, offset_x: int, offset_y: int) -> List[Dict]:
+        """
+        Detect traffic lights within a specific region with higher sensitivity.
+        """
+        # Use lower confidence for regional detection since we're in a promising area
+        region_conf = max(0.1, self.config.get('yolo_confidence', 0.25) * 0.7)
+        
+        results = self.yolo_model(region, 
+                                 conf=region_conf,
+                                 classes=[9],  # Traffic light only
+                                 verbose=False)
+        
+        detected_lights = []
+        
+        for result in results:
+            if result.boxes is not None:
+                for box in result.boxes:
+                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                    conf = box.conf[0].cpu().numpy()
+                    
+                    x, y, w, h = int(x1), int(y1), int(x2 - x1), int(y2 - y1)
+                    
+                    # Extract ROI for color analysis (coordinates relative to region)
+                    traffic_light_roi = region[y:y+h, x:x+w]
+                    
+                    if traffic_light_roi.size > 0:
+                        state = self._classify_traffic_light_state(traffic_light_roi)
+                        
+                        detected_lights.append({
+                            'bbox': (x, y, w, h),  # Will be adjusted by caller
+                            'state': state,
+                            'confidence': float(conf),
+                            'center': (x + w//2, y + h//2),  # Will be adjusted by caller
+                            'method': 'regional'
+                        })
+        
+        return detected_lights
+    
+    def _remove_overlapping_regions(self, regions: List[Tuple[int, int, int, int]]) -> List[Tuple[int, int, int, int]]:
+        """
+        Remove overlapping bounding box regions, keeping the larger ones.
+        """
+        if not regions:
+            return []
+        
+        # Sort by area (largest first)
+        regions = sorted(regions, key=lambda r: r[2] * r[3], reverse=True)
+        
+        filtered = []
+        for region in regions:
+            x1, y1, w1, h1 = region
+            
+            # Check if this region overlaps significantly with any already kept region
+            overlaps = False
+            for kept in filtered:
+                x2, y2, w2, h2 = kept
+                
+                # Calculate intersection
+                ix1 = max(x1, x2)
+                iy1 = max(y1, y2)
+                ix2 = min(x1 + w1, x2 + w2)
+                iy2 = min(y1 + h1, y2 + h2)
+                
+                if ix1 < ix2 and iy1 < iy2:
+                    intersection_area = (ix2 - ix1) * (iy2 - iy1)
+                    region_area = w1 * h1
+                    
+                    # If more than 30% overlap, consider it duplicate
+                    if intersection_area / region_area > 0.3:
+                        overlaps = True
+                        break
+            
+            if not overlaps:
+                filtered.append(region)
+        
+        return filtered
+    
+    def _get_adaptive_confidence(self, image: np.ndarray) -> float:
+        """
+        Calculate adaptive confidence threshold based on image characteristics.
+        """
+        if not self.config.get('adaptive_confidence', False):
+            return self.config.get('yolo_confidence', 0.25)
+        
+        # Image size factor - larger images can use lower confidence
+        height, width = image.shape[:2]
+        image_size = width * height
+        size_threshold = self.config.get('image_size_threshold', 800) ** 2
+        
+        min_conf = self.config.get('min_yolo_confidence', 0.1)
+        max_conf = self.config.get('max_yolo_confidence', 0.3)
+        
+        if image_size > size_threshold:
+            # Large image - use lower confidence for distant objects
+            confidence = min_conf + (max_conf - min_conf) * 0.3
+        else:
+            # Small image - use higher confidence to reduce noise
+            confidence = min_conf + (max_conf - min_conf) * 0.7
+        
+        return confidence
     
     def _detect_with_color(self, image: np.ndarray) -> List[Dict]:
         """
@@ -338,6 +620,18 @@ class TrafficLightDetector:
         Returns:
             Preprocessed image optimized for distant object detection
         """
+        # Fast mode: just apply CLAHE without color space conversion
+        if self.config.get('fast_mode', True):
+            # Convert to grayscale, apply CLAHE, then convert back to BGR
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            enhanced_gray = clahe.apply(gray)
+            # Convert back to BGR by duplicating the enhanced channel
+            enhanced = cv2.cvtColor(enhanced_gray, cv2.COLOR_GRAY2BGR)
+            # Blend with original to preserve color information
+            return cv2.addWeighted(image, 0.7, enhanced, 0.3, 0)
+        
+        # Full preprocessing (slower but better quality)
         # Convert to LAB color space for better illumination handling
         lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
         l, a, b = cv2.split(lab)
@@ -440,8 +734,11 @@ class TrafficLightDetector:
             else:
                 scaled_image = image
             
-            # Apply preprocessing for distant detection
-            processed_image = self._preprocess_for_distant_detection(scaled_image)
+            # Conditionally apply preprocessing for distant detection
+            if self.config.get('enable_preprocessing', False):
+                processed_image = self._preprocess_for_distant_detection(scaled_image)
+            else:
+                processed_image = scaled_image
             
             # Run detection on processed image
             results = self.yolo_model(processed_image, conf=conf, classes=classes, imgsz=imgsz, augment=augment)
@@ -771,13 +1068,14 @@ class TrafficLightDetector:
         
         return grouped
     
-    def draw_detections(self, image: np.ndarray, detections: List[Dict]) -> np.ndarray:
+    def draw_detections(self, image: np.ndarray, detections: List[Dict], show_method: bool = False) -> np.ndarray:
         """
         Draw detected traffic lights on the image.
         
         Args:
             image: Input image
             detections: List of detections from detect_traffic_lights
+            show_method: Whether to show detection method indicators
             
         Returns:
             Image with drawn detections
@@ -796,14 +1094,59 @@ class TrafficLightDetector:
             x, y, w, h = detection['bbox']
             state = detection['state']
             confidence = detection['confidence']
+            method = detection.get('method', 'unknown')
             
-            # Draw bounding box
+            # Draw bounding box with different thickness for different methods
             color = color_map.get(state, (128, 128, 128))
-            cv2.rectangle(result, (x, y), (x + w, y + h), color, 2)
+            thickness = 3 if method in ['two-stage', 'regional'] else 2
+            cv2.rectangle(result, (x, y), (x + w, y + h), color, thickness)
             
-            # Draw label
+            # Draw method indicator if requested
+            if show_method:
+                method_colors = {
+                    'yolo': (0, 255, 255),      # Cyan
+                    'two-stage': (255, 0, 255), # Magenta  
+                    'regional': (255, 128, 0),   # Orange
+                    'color': (255, 255, 0)       # Yellow
+                }
+                method_color = method_colors.get(method, (128, 128, 128))
+                cv2.circle(result, (x + w - 15, y + 15), 8, method_color, -1)
+                
+                # Method abbreviations
+                method_text = {
+                    'yolo': '1S',
+                    'two-stage': '2S', 
+                    'regional': 'R',
+                    'color': 'C'
+                }.get(method, '?')
+                
+                cv2.putText(result, method_text, (x + w - 20, y + 20), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+            
+            # Draw confidence bar
+            bar_width = w
+            bar_height = 6
+            bar_x = x
+            bar_y = y - bar_height - 5
+            
+            # Background bar
+            cv2.rectangle(result, (bar_x, bar_y), (bar_x + bar_width, bar_y + bar_height), 
+                         (50, 50, 50), -1)
+            # Confidence bar
+            conf_width = int(bar_width * confidence)
+            cv2.rectangle(result, (bar_x, bar_y), (bar_x + conf_width, bar_y + bar_height), 
+                         (0, 255, 255), -1)
+            
+            # Draw label with background
             label = f"{state.value}: {confidence:.2f}"
-            cv2.putText(result, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 
+            (text_width, text_height), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+            
+            # Text background
+            cv2.rectangle(result, (x, y - text_height - 20), 
+                         (x + text_width + 10, y - 10), (0, 0, 0), -1)
+            
+            # Text
+            cv2.putText(result, label, (x + 5, y - 15), cv2.FONT_HERSHEY_SIMPLEX, 
                        0.6, color, 2)
         
         return result

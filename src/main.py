@@ -167,6 +167,7 @@ def process_video(detector: TrafficLightDetector, video_path: str, output_path: 
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
     
     frame_count = 0
+    skip_frames = detector.config.get('skip_frames', 1)  # Process every Nth frame for performance
     
     try:
         while True:
@@ -175,7 +176,19 @@ def process_video(detector: TrafficLightDetector, video_path: str, output_path: 
                 break
             
             frame_count += 1
-            print(f"Processing frame {frame_count}/{total_frames}", end='\r')
+            
+            # Skip frames for performance if configured
+            if frame_count % skip_frames != 0:
+                # Still show the frame but don't process it
+                cv2.imshow("Traffic Light Detection - Video", frame)
+                if out:
+                    out.write(frame)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    print("\nStopping video processing...")
+                    break
+                continue
+            
+            print(f"Processing frame {frame_count}/{total_frames} (every {skip_frames})", end='\r')
             
             # Detect traffic lights
             detections = detector.detect_traffic_lights(frame)
@@ -238,6 +251,10 @@ def process_camera(detector: TrafficLightDetector):
         print("Error: Could not open camera")
         return
     
+    frame_count = 0
+    skip_frames = detector.config.get('skip_frames', 1)  # Process every Nth frame for performance
+    last_detections = []  # Cache last detections for skipped frames
+    
     try:
         while True:
             ret, frame = cap.read()
@@ -245,21 +262,30 @@ def process_camera(detector: TrafficLightDetector):
                 print("Error: Could not read frame from camera")
                 break
             
-            # Detect traffic lights
-            detections = detector.detect_traffic_lights(frame)
+            frame_count += 1
+            
+            # Process detection only on every Nth frame for performance
+            if frame_count % skip_frames == 0:
+                detections = detector.detect_traffic_lights(frame)
+                last_detections = detections  # Cache for next frames
+            else:
+                detections = last_detections  # Use cached detections
             
             # Draw detections
             result_frame = detector.draw_detections(frame, detections)
             
-            # Add instructions to the frame
+            # Add instructions and performance info to the frame
             cv2.putText(result_frame, "Press 'q' to quit", (10, 30), 
                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            if skip_frames > 1:
+                cv2.putText(result_frame, f"Processing every {skip_frames} frames", (10, 60), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
             
             # Show frame
             cv2.imshow("Traffic Light Detection - Live", result_frame)
             
             # Print detections (optional, might be too verbose)
-            if detections:
+            if detections and frame_count % skip_frames == 0:
                 states = [d['state'].value for d in detections]
                 print(f"Detected: {', '.join(states)}", end='\r')
             
@@ -357,6 +383,8 @@ def main():
     parser.add_argument('--output', type=str, help='Output path for results')
     parser.add_argument('--config', type=str, help='Path to configuration file')
     parser.add_argument('--no-yolo', action='store_true', help='Use color-based detection instead of YOLO')
+    parser.add_argument('--visualize', action='store_true', help='Use enhanced visualization mode with pole detection')
+    parser.add_argument('--show-method', action='store_true', help='Show detection method indicators in output')
     
     args = parser.parse_args()
     
@@ -372,27 +400,64 @@ def main():
     
     # Run appropriate processing mode
     try:
-        if args.image:
-            if not os.path.exists(args.image):
-                print(f"Error: Image file {args.image} not found")
+        # Check if enhanced visualization is requested
+        if args.visualize:
+            print("🎨 Enhanced visualization mode enabled")
+            if args.camera:
+                # Use the enhanced camera visualization
+                import sys
+                sys.path.append('.')
+                from visualizer import process_camera_with_visualization
+                process_camera_with_visualization(detector, show_poles=True)
+            elif args.image:
+                if not os.path.exists(args.image):
+                    print(f"Error: Image file {args.image} not found")
+                    return 1
+                # Use the enhanced image visualization  
+                import sys
+                sys.path.append('.')
+                from visualizer import process_image_with_visualization
+                process_image_with_visualization(detector, args.image, show_poles=True)
+            elif args.video:
+                # Check if it's a YouTube URL or local file
+                if not is_youtube_url(args.video) and not os.path.exists(args.video):
+                    print(f"Error: Video file {args.video} not found")
+                    return 1
+                # Use the enhanced video visualization
+                import sys
+                sys.path.append('.')
+                from visualizer import process_video_with_visualization
+                process_video_with_visualization(detector, args.video, args.output, show_poles=True)
+            else:
+                print("Enhanced visualization supports --camera, --image, and --video modes")
                 return 1
-            process_image(detector, args.image, args.output)
-        
-        elif args.video:
-            # Check if it's a YouTube URL or local file
-            if not is_youtube_url(args.video) and not os.path.exists(args.video):
-                print(f"Error: Video file {args.video} not found")
+        else:
+            # Standard processing modes
+            if args.image:
+                if not os.path.exists(args.image):
+                    print(f"Error: Image file {args.image} not found")
+                    return 1
+                process_image(detector, args.image, args.output)
+            
+            elif args.video:
+                # Check if it's a YouTube URL or local file
+                if not is_youtube_url(args.video) and not os.path.exists(args.video):
+                    print(f"Error: Video file {args.video} not found")
+                    return 1
+                process_video(detector, args.video, args.output)
+            
+            elif args.camera:
+                process_camera(detector)
+            
+            elif args.batch:
+                if not os.path.exists(args.batch):
+                    print(f"Error: Directory {args.batch} not found")
+                    return 1
+                process_batch(detector, args.batch, args.output)
+            
+            else:
+                print("Please specify an input mode. Use --help for available options.")
                 return 1
-            process_video(detector, args.video, args.output)
-        
-        elif args.camera:
-            process_camera(detector)
-        
-        elif args.batch:
-            if not os.path.exists(args.batch):
-                print(f"Error: Directory {args.batch} not found")
-                return 1
-            process_batch(detector, args.batch, args.output)
     
     except KeyboardInterrupt:
         print("\nOperation cancelled by user")
