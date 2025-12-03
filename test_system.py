@@ -15,24 +15,31 @@ from traffic_light_detector import TrafficLightDetector
 
 
 def create_synthetic_traffic_light():
-    """Create a synthetic traffic light image for testing"""
-    # Create a blank image (white background)
-    img = np.ones((400, 600, 3), dtype=np.uint8) * 255
+    """Create a more realistic synthetic traffic light image for testing"""
+    # Create a blank image (realistic background)
+    img = np.ones((400, 600, 3), dtype=np.uint8) * 180  # Gray background
     
-    # Traffic light housing (dark gray rectangle)
-    cv2.rectangle(img, (250, 50), (350, 300), (50, 50, 50), -1)
+    # Add some noise for realism
+    noise = np.random.randint(-30, 30, (400, 600, 3), dtype=np.int16)
+    img = np.clip(img.astype(np.int16) + noise, 0, 255).astype(np.uint8)
     
-    # Red light (top) - currently ON
-    cv2.circle(img, (300, 100), 25, (0, 0, 255), -1)  # Red circle
-    cv2.circle(img, (300, 100), 25, (200, 200, 200), 3)  # Light gray border
+    # Traffic light housing (black rectangle)
+    cv2.rectangle(img, (240, 40), (360, 320), (20, 20, 20), -1)
+    cv2.rectangle(img, (240, 40), (360, 320), (100, 100, 100), 3)  # Border
+    
+    # Red light (top) - currently ON - make it very bright and saturated
+    cv2.circle(img, (300, 100), 30, (0, 0, 255), -1)  # Bright red
+    cv2.circle(img, (300, 100), 25, (0, 0, 220), -1)  # Inner bright red
+    cv2.circle(img, (300, 100), 20, (0, 0, 180), -1)  # Core
+    cv2.circle(img, (300, 100), 30, (80, 80, 80), 2)  # Dark border
     
     # Yellow light (middle) - OFF
-    cv2.circle(img, (300, 175), 25, (100, 100, 100), -1)  # Dark gray (off)
-    cv2.circle(img, (300, 175), 25, (200, 200, 200), 3)  # Light gray border
+    cv2.circle(img, (300, 180), 30, (60, 60, 60), -1)  # Dark gray (off)
+    cv2.circle(img, (300, 180), 30, (80, 80, 80), 2)  # Dark border
     
     # Green light (bottom) - OFF  
-    cv2.circle(img, (300, 250), 25, (100, 100, 100), -1)  # Dark gray (off)
-    cv2.circle(img, (300, 250), 25, (200, 200, 200), 3)  # Light gray border
+    cv2.circle(img, (300, 260), 30, (60, 60, 60), -1)  # Dark gray (off)
+    cv2.circle(img, (300, 260), 30, (80, 80, 80), 2)  # Dark border
     
     return img
 

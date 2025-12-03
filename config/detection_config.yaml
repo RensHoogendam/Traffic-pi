@@ -1,9 +1,9 @@
 # Traffic Light Detection Configuration
 # Adjust these parameters to fine-tune detection for your specific use case
 
-# Contour area constraints (in pixels)
-min_contour_area: 100        # Minimum area for a valid traffic light detection
-max_contour_area: 10000      # Maximum area for a valid traffic light detection
+# Contour area constraints (in pixels) - made more permissive for distant lights
+min_contour_area: 25         # Much smaller minimum for distant traffic lights
+max_contour_area: 20000      # Larger maximum for close traffic lights
 
 # Shape validation parameters
 aspect_ratio_tolerance: 0.3   # Tolerance for aspect ratio (how circular the shape should be)
@@ -44,10 +44,28 @@ default_camera_index: 0       # Default camera to use (0 is usually built-in cam
 video_fps_limit: 30          # Maximum FPS for video processing (0 = no limit)
 
 # Performance optimization
-resize_width: 640            # Resize images to this width for faster processing (0 = no resize)
+resize_width: 0              # Don't resize - keep full resolution for distant detection
 roi_enabled: false           # Enable region of interest processing
 roi_coordinates: [0, 0, 640, 480]  # [x, y, width, height] for ROI
 
+# YOLO detection parameters
+use_yolo: true                # Use YOLO model for detection (more accurate)
+yolo_model: "yolov8s.pt"      # Small model for better accuracy at distance
+yolo_confidence: 0.15         # Lower confidence for distant objects
+yolo_classes: [9]             # COCO class IDs to detect (9 = traffic light)
+yolo_imgsz: 640               # Image size for YOLO inference (higher = better distant detection)
+yolo_augment: true            # Use test-time augmentation for better detection
+
+# Multi-scale detection settings
+enable_multiscale: true       # Process image at multiple scales
+scale_factors: [0.8, 1.0, 1.2, 1.5]  # Scale factors for multi-scale detection
+
+# Adaptive confidence based on image characteristics
+adaptive_confidence: true     # Automatically adjust confidence based on image size/quality
+min_yolo_confidence: 0.1      # Minimum YOLO confidence for large/high-quality images
+max_yolo_confidence: 0.3      # Maximum YOLO confidence for small/low-quality images
+image_size_threshold: 800     # Images larger than this use lower confidence for distant objects
+
 # Advanced detection parameters
-use_adaptive_threshold: false  # Use adaptive thresholding for better performance in varying light
+use_adaptive_threshold: false # Use adaptive thresholding for better performance in varying light
 gaussian_blur_kernel: 3       # Kernel size for Gaussian blur preprocessing (0 = no blur)

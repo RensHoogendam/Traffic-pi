@@ -4,12 +4,13 @@ A computer vision system for detecting and classifying traffic lights using Pyth
 
 ## Features
 
-- **Real-time Detection**: Identify traffic lights in images, videos, and live camera feeds
-- **State Classification**: Determine if lights are red, yellow/amber, or green
-- **Multiple Input Sources**: Support for images, videos, YouTube URLs, camera feeds, and batch processing
-- **Raspberry Pi Compatible**: Optimized to run on Raspberry Pi for edge deployment
-- **Configurable**: Adjustable detection parameters via configuration files
-- **Easy to Use**: Simple command-line interface and Python API
+- **🤖 AI-Powered Detection**: Uses YOLOv8 for accurate traffic light detection with color-based fallback
+- **🚦 State Classification**: Determine if lights are red, yellow/amber, or green
+- **📱 Multiple Input Sources**: Support for images, videos, YouTube URLs, camera feeds, and batch processing
+- **🔧 Dual Detection Modes**: YOLO for accuracy, color-based for speed and legacy support
+- **🥧 Raspberry Pi Compatible**: Optimized to run on Raspberry Pi for edge deployment
+- **⚙️ Configurable**: Adjustable detection parameters via configuration files
+- **💻 Easy to Use**: Simple command-line interface and Python API
 
 ## Quick Start
 
@@ -110,6 +111,15 @@ traffic-pi --batch path/to/images/ --output results/
 traffic-detect --image path/to/image.jpg  # Same as traffic-pi
 ```
 
+**Detection Mode Options:**
+```bash
+# Use YOLO detection (default - most accurate)
+traffic-pi --image path/to/image.jpg
+
+# Use color-based detection (faster, works without GPU)
+traffic-pi --no-yolo --image path/to/image.jpg
+```
+
 #### Test the Installation:
 
 ```bash
@@ -156,17 +166,40 @@ The system automatically:
 2. Processes it for traffic light detection
 3. Cleans up temporary files after processing
 
+## Detection Methods
+
+Traffic-pi supports two detection approaches:
+
+### 🤖 YOLO Detection (Default)
+- **What it is**: Uses YOLOv8 neural network trained on millions of images
+- **Accuracy**: Extremely high - can detect traffic lights in complex scenes
+- **Speed**: Fast on GPU, moderate on CPU
+- **Best for**: Production use, complex traffic scenes, varying lighting
+- **Requirements**: Downloads ~6MB model on first use
+
+### 🎨 Color-Based Detection (Fallback)
+- **What it is**: HSV color space analysis with shape detection
+- **Accuracy**: Good for clear, well-lit traffic lights
+- **Speed**: Very fast, no GPU needed
+- **Best for**: Simple scenes, resource-constrained devices, development
+- **Requirements**: Only OpenCV
+
+The system automatically falls back to color-based detection if YOLO fails to load.
+
 ## How It Works
 
-The traffic light detection system uses computer vision techniques:
+### YOLO Detection Pipeline:
+1. **Object Detection**: YOLOv8 identifies traffic light objects in the scene
+2. **Region Extraction**: Extracts detected traffic light regions
+3. **State Classification**: Analyzes color distribution within each region
+4. **Confidence Scoring**: Combines YOLO confidence with color analysis
 
+### Color-Based Detection Pipeline:
 1. **Color Segmentation**: Converts images to HSV color space and creates masks for red, yellow, and green colors
-2. **Shape Analysis**: Identifies circular/elliptical shapes that match traffic light characteristics
+2. **Shape Analysis**: Identifies circular/elliptical shapes that match traffic light characteristics  
 3. **Contour Detection**: Finds and validates contours based on area, circularity, and other properties
-4. **Confidence Scoring**: Assigns confidence scores based on shape quality and color intensity
-5. **Grouping**: Groups nearby detections to avoid duplicate detections of the same light
-
-### Detection Algorithm
+4. **Clustering**: Groups nearby lights that form traffic light patterns
+5. **Confidence Scoring**: Assigns confidence scores based on shape quality and color intensity### Detection Algorithm
 
 - **HSV Color Ranges**:
   - Red: [0°-10°, 170°-180°] hue ranges

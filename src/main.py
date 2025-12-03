@@ -356,13 +356,16 @@ def main():
     # Optional arguments
     parser.add_argument('--output', type=str, help='Output path for results')
     parser.add_argument('--config', type=str, help='Path to configuration file')
+    parser.add_argument('--no-yolo', action='store_true', help='Use color-based detection instead of YOLO')
     
     args = parser.parse_args()
     
     # Initialize detector
     try:
-        detector = TrafficLightDetector(config_path=args.config)
-        print("Traffic Light Detector initialized successfully")
+        use_yolo = not args.no_yolo  # Use YOLO unless --no-yolo flag is set
+        detector = TrafficLightDetector(config_path=args.config, use_yolo=use_yolo)
+        detection_method = "YOLO" if detector.use_yolo else "Color-based"
+        print(f"Traffic Light Detector initialized successfully using {detection_method} detection")
     except Exception as e:
         print(f"Error initializing detector: {e}")
         return 1
