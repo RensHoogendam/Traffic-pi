@@ -1,0 +1,45 @@
+# Optimized Training Configuration for Traffic Lights
+# This config is tuned for traffic light detection
+
+# Model settings
+model: yolov8s.pt  # Start with small model for good accuracy/speed balance
+
+# Training parameters  
+epochs: 100
+batch: 16          # Adjust based on your GPU memory
+imgsz: 640        # Image size for training
+device: 0         # GPU device (use 'cpu' for CPU training)
+
+# Learning rate settings
+lr0: 0.01         # Initial learning rate
+lrf: 0.1          # Final learning rate factor
+momentum: 0.937   # SGD momentum
+weight_decay: 0.0005
+
+# Augmentation settings (good for traffic lights)
+hsv_h: 0.015      # Hue augmentation
+hsv_s: 0.7        # Saturation augmentation  
+hsv_v: 0.4        # Value augmentation
+degrees: 10.0     # Rotation degrees
+translate: 0.1    # Translation
+scale: 0.5        # Scale augmentation
+shear: 2.0        # Shear degrees
+perspective: 0.0  # Perspective augmentation
+flipud: 0.0       # Vertical flip (don't flip traffic lights!)
+fliplr: 0.5       # Horizontal flip
+mosaic: 1.0       # Mosaic augmentation
+mixup: 0.1        # MixUp augmentation
+
+# Validation settings
+val: true         # Validate during training
+save_period: 10   # Save checkpoint every N epochs
+patience: 50      # Early stopping patience
+
+# Optimization
+optimizer: SGD    # Optimizer (SGD, Adam, AdamW)
+close_mosaic: 10  # Disable mosaic in final epochs
+
+# Loss weights (tune for traffic lights)
+box: 7.5          # Box loss weight
+cls: 0.5          # Classification loss weight  
+dfl: 1.5          # Distribution focal loss weight

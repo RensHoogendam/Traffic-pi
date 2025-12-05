@@ -1,0 +1,19 @@
+
+# Traffic Light Dataset Configuration
+# Save this as 'traffic_lights.yaml'
+
+# Dataset paths
+path: ./datasets/traffic_lights  # Root directory
+train: images/train              # Training images (relative to path)
+val: images/val                  # Validation images (relative to path)
+test: images/test               # Test images (optional)
+
+# Classes (customize based on your needs)
+names:
+  0: traffic_light_red
+  1: traffic_light_yellow  
+  2: traffic_light_green
+  3: traffic_light_unknown
+
+# Number of classes
+nc: 4

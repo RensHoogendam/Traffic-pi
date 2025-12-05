@@ -1,0 +1,63 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Traffic Light Annotator</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .info { background: #e3f2fd; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        .option { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .command { background: #263238; color: #ffffff; padding: 10px; border-radius: 3px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚦 Traffic Light Annotation Options</h1>
+        
+        <div class="info">
+            <h3>labelImg Compatibility Issue Detected</h3>
+            <p>Your Python 3.14 version has compatibility issues with labelImg. Here are your options:</p>
+        </div>
+        
+        <div class="option">
+            <h3>🎯 Option 1: Custom Annotation Tool (Recommended)</h3>
+            <p>Use our custom-built annotation tool with Python 3.14 compatibility:</p>
+            <div class="command">python annotation_tool.py training_data/extracted_frames</div>
+            <p><strong>Features:</strong> Simple interface, YOLO format output, keyboard shortcuts</p>
+        </div>
+        
+        <div class="option">
+            <h3>🏷️ Option 2: Fixed labelImg</h3>
+            <p>Try the patched labelImg version:</p>
+            <div class="command">python annotation_workflow.py --labelimg training_data/extracted_frames</div>
+            <p><strong>Features:</strong> Full labelImg functionality with compatibility fixes</p>
+        </div>
+        
+        <div class="option">
+            <h3>🌐 Option 3: Web-based Annotation</h3>
+            <p>Use online annotation tools:</p>
+            <ul>
+                <li><a href="https://www.makesense.ai/" target="_blank">makesense.ai</a> - Free online tool</li>
+                <li><a href="https://roboflow.com/" target="_blank">Roboflow</a> - Advanced features</li>
+                <li><a href="https://labelbox.com/" target="_blank">Labelbox</a> - Professional solution</li>
+            </ul>
+        </div>
+        
+        <div class="option">
+            <h3>📋 Controls for Custom Tool</h3>
+            <ul>
+                <li><strong>Left-click + drag:</strong> Draw bounding box</li>
+                <li><strong>1-4 keys:</strong> Switch traffic light class (red/yellow/green/unknown)</li>
+                <li><strong>Space/Enter:</strong> Save and next image</li>
+                <li><strong>Backspace:</strong> Previous image</li>
+                <li><strong>U:</strong> Undo last annotation</li>
+                <li><strong>C:</strong> Clear all annotations</li>
+                <li><strong>S:</strong> Save current annotations</li>
+                <li><strong>Q:</strong> Quit</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
+        
